@@ -1,0 +1,5 @@
+CURRENT_DATASET: "CIENCIA_DA_COMPUTACAO"
+
+DATASETS:
+  CIENCIA_DA_COMPUTACAO:
+    TRAINING_DATASET: s3://pipeout-database/datasets /ciencia_da_computacao/treino/ciencia_da_computacao_2017_1_2025_1_treino.csv

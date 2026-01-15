@@ -1,0 +1,14 @@
+services:
+  train:
+     build:
+       context: ..
+       dockerfile: infra/Dockerfile 
+     container_name: train-app
+     volumes:
+       - ../scripts:/training-app/scripts
+       - ../configs:/training-app/configs
+     ports: 
+       - "8080:8080"
+     env_file:
+        - ../.env
+     restart: "no"
