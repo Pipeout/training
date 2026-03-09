@@ -2,4 +2,5 @@ scikit-learn
 pandas
 PyYAML
 fsspec
-s3fs 
+s3fs
+scipy

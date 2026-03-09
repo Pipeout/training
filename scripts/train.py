@@ -1,18 +1,20 @@
 import logging
 import os
+from pathlib import Path
+
+import joblib
 
 # import joblib
 import pandas as pd
 import yaml
-from pathlib import Path 
+from scipy import *
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-# from scipy import *
-# from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-# from sklearn.feature_selection import SelectKBest, f_regression
-# from sklearn.linear_model import LinearRegression, LogisticRegression
-# from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-# from sklearn.model_selection import train_test_split
-# from sklearn.preprocessing import LabelEncoder, StandardScaler
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "configs" / "training.yaml"
 
@@ -44,21 +46,24 @@ if __name__ == "__main__":
 
 
 
-  print("\n\n\nhello, i got here")
-  
-  
-  print(df_to_train)
-  # df_to_train_final = pd.get_dummies(df_to_train,
-  #                                   columns=["Sexo",
-  #                                             "Raça",
-  #                                             "Naturalidade",
-  #                                             "UF Naturalidade",
-  #                                             "Tipo ingresso",
-  #                                             "Tipo de demanda"
-  #                                             ],drop_first=True)
+
+
+  df_to_train_final = pd.get_dummies(df_to_train,
+                                    columns=["Sexo",
+                                              "Raça",
+                                              "Naturalidade",
+                                              "UF Naturalidade",
+                                              "Tipo ingresso",
+                                              "Tipo de demanda"
+                                              ],drop_first=True)
+
+
+  print("Starting training")
 
   # X = df_to_train_final.drop('dataset', axis=1)
   # not_encoded_y = df_to_train_final['dataset']
+
+
 
   # X_train_troll, X_test_troll, y_train_troll, y_test_troll = train_test_split(X, not_encoded_y, test_size=0.2, random_state=42)
 

@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-WORKDIR /training_app
+WORKDIR /training-app
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -18,6 +18,6 @@ COPY infra/requirements.txt requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-EXPOSE 8080
+EXPOSE 8081
 
 ENTRYPOINT [ "./entrypoint.sh" ]
