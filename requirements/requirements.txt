@@ -4,3 +4,4 @@ PyYAML
 fsspec
 s3fs
 scipy
+seaborn

@@ -15,17 +15,8 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-
-
-
-
-def get_config_file(): 
-    try:
-        BASE_DIR = Path(__file__).resolve().parent.parent
-        CONFIG_PATH = BASE_DIR / "configs" / "training.yaml"
-        return CONFIG_PATH
-    except NameError: # if it is a jupyter file 
-        return Path("/training-app/configs/training.yaml")
+BASE_DIR = Path(__file__).resolve().parent.parent
+CONFIG_PATH = BASE_DIR / "configs" / "training.yaml"
 
 
 def load_config(CONFIG_PATH) :
@@ -50,8 +41,6 @@ def load_config(CONFIG_PATH) :
 
 if __name__ == "__main__":
 
-
-  CONFIG_PATH = get_config_file()
   config = load_config(CONFIG_PATH)
   df_to_train = pd.read_csv(config["TRAINING_DATASET"])
 
