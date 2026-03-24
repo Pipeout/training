@@ -5,3 +5,5 @@ fsspec
 s3fs
 scipy
 seaborn
+catboost 
+lightgbm
