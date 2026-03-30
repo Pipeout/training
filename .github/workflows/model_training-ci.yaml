@@ -31,5 +31,5 @@ jobs:
           file: infra/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/model_training:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/model_training:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/model_training_v0:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/model_training_v0:${{ github.sha }}
