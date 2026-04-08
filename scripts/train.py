@@ -3,16 +3,30 @@ import time
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import mlflow.catboost
 import numpy as np
 import pandas as pd
 import yaml
 from catboost import CatBoostClassifier
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
+    accuracy_score,
     classification_report,
     confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
 )
 from sklearn.model_selection import GroupShuffleSplit
+
+import mlflow
+
+mlflow.set_tracking_uri("http://mlflow:5000")
+experiment_name = "fourthr"
+# mlflow.create_experiment(
+#     experiment_name, artifact_location="s3://pipeout-database/mlflow-artifacts"
+# )
+mlflow.set_experiment(experiment_name)
 
 
 def load_config(CONFIG_PATH):
@@ -100,16 +114,21 @@ def selecting_active_students(df: pd.DataFrame) -> pd.DataFrame:
 
 def model_fitting(X_train, y_train):
 
-    cat = CatBoostClassifier(iterations=300, learning_rate=0.01, depth=6, verbose=0)
+    params = {"iterations": 300, "learning_rate": 0.01, "depth": 6, "verbose": 0}
+
+    cat = CatBoostClassifier(**params)
     cat_features = X_train.select_dtypes(
         include=["object", "bool", "category"]
     ).columns.tolist()
 
     cat.fit(X_train, y_train, cat_features=cat_features)
+
+    mlflow.log_params(params)
     return cat
 
 
-def results(cat, y_test):
+def results(cat, y_test, X_test):
+
     y_pred = cat.predict(X_test)
 
     cm = confusion_matrix(y_test, y_pred)
@@ -120,6 +139,15 @@ def results(cat, y_test):
             y_test, y_pred, target_names=["Formado (0)", "Evadido (1)"]
         )
     )
+    acc = accuracy_score(y_test, y_pred)
+    prec = precision_score(y_test, y_pred)
+    rec = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+
+    mlflow.log_metric("accuracy", acc)
+    mlflow.log_metric("precision", prec)
+    mlflow.log_metric("recall", rec)
+    mlflow.log_metric("f1_score", f1)
 
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm, display_labels=["Formado", "Evadido"]
@@ -130,32 +158,32 @@ def results(cat, y_test):
 
 
 if __name__ == "__main__":
-    startTime = time.time()
+    with mlflow.start_run() as run:
+        startTime = time.time()
+        CONFIG_PATH = get_config_file()
+        dfs = load_config(CONFIG_PATH)
 
-    CONFIG_PATH = get_config_file()
-    dfs = load_config(CONFIG_PATH)
+        df_base = pd.read_csv(dfs["TRAINING_DATASET"])
 
-    df_base = pd.read_csv(dfs["TRAINING_DATASET"])
+        df_base = selecting_active_students(df_base)
+        df_base.drop(
+            columns={
+                "Sexo",
+                "Raça",
+                "Estrutura",
+                "Período ingresso",
+                "Tipo ingresso",
+                "AnoSem",
+            },
+            inplace=True,
+        )
 
-    df_base = selecting_active_students(df_base)
-    df_base.drop(
-        columns={
-            "Sexo",
-            "Raça",
-            # "Naturalidade",
-            # "Reprovacao_Ponderada_Semestral",
-            # "UF Naturalidade",
-            #  "Periodo_Atual",
-            "Estrutura",
-            "Período ingresso",
-            "Tipo ingresso",
-            "AnoSem",
-        },
-        inplace=True,
-    )
+        X_train, X_test, y_train, y_test = splitting(df_base)
+        mlflow.log_param("train_size", len(X_train))
+        mlflow.log_param("test_size", len(X_test))
+        model = model_fitting(X_train, y_train)
+        results(model, y_test, X_test)
+        mlflow.catboost.log_model(model, "model")
 
-    X_train, X_test, y_train, y_test = splitting(df_base)
-    model = model_fitting(X_train, y_train)
-    results(model, y_test)
-    totalTime = time.time() - startTime
-    print(f"Total training time: {totalTime:.2f} seconds")
+        totalTime = time.time() - startTime
+        print(f"Total training time: {totalTime:.2f} seconds")
