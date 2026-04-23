@@ -2,7 +2,6 @@ services:
   train:
     build:
       context: ..
-
       dockerfile: infra/Dockerfile
     container_name: train-app
     networks:

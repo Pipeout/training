@@ -1,13 +1,15 @@
 import logging
 import time
 from pathlib import Path
-
 import matplotlib.pyplot as plt
-import mlflow.catboost
+# import mlflow.lightgbm 
 import numpy as np
 import pandas as pd
 import yaml
-from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+
+import re
+import unicodedata
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     accuracy_score,
@@ -18,6 +20,10 @@ from sklearn.metrics import (
     recall_score,
 )
 from sklearn.model_selection import GroupShuffleSplit
+
+
+from sklearn.preprocessing import OneHotEncoder
+
 
 import mlflow
 
@@ -50,6 +56,27 @@ def load_config(CONFIG_PATH):
         )
         raise
 
+def clean_feature_values(col):
+    def normalize(x):
+        if pd.isna(x):
+            return 'unknown'
+        
+        # remove accents
+        x = unicodedata.normalize('NFKD', x).encode('ascii', 'ignore').decode('utf-8')
+        
+        # lowercase
+        x = x.lower()
+        
+        # replace spaces with underscore
+        x = re.sub(r'\s+', '_', x)
+        
+        # remove everything not alphanumeric or underscore
+        x = re.sub(r'[^a-z0-9_]', '', x)
+        
+        return x
+    
+    return col.apply(normalize)
+
 
 def get_config_file():
     try:
@@ -60,11 +87,9 @@ def get_config_file():
         return Path("/training-app/configs/training.yaml")
 
 
-def splitting(df_base: pd.DataFrame):
-    y = df_base["Target_Evaded"]
+def splitting(df_base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, list[str]]:
 
-    ## IMI is leakage!
-    ## Periodo_Atual is leakage!
+    y = df_base["Target_Evaded"]
 
     cols_to_drop = [
         "RGA_Anon",
@@ -75,6 +100,7 @@ def splitting(df_base: pd.DataFrame):
         "Periodo_Atual",
     ]
     X = df_base.drop(columns=cols_to_drop)
+
     cat_features = X.select_dtypes(
         include=["object", "bool", "category"]
     ).columns.tolist()
@@ -112,24 +138,20 @@ def selecting_active_students(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def model_fitting(X_train, y_train):
+def model_fitting(X_train, y_train, params):
 
-    params = {"iterations": 300, "learning_rate": 0.01, "depth": 6, "verbose": 0}
+    lgb = LGBMClassifier(**params)
 
-    cat = CatBoostClassifier(**params)
-    cat_features = X_train.select_dtypes(
-        include=["object", "bool", "category"]
-    ).columns.tolist()
-
-    cat.fit(X_train, y_train, cat_features=cat_features)
+    lgb.fit(X_train, y_train)
 
     mlflow.log_params(params)
-    return cat
+    print(type(lgb))
+    return lgb
 
 
-def results(cat, y_test, X_test):
+def results(model, y_test, X_test):
 
-    y_pred = cat.predict(X_test)
+    y_pred = model.predict(X_test)
 
     cm = confusion_matrix(y_test, y_pred)
 
@@ -156,34 +178,68 @@ def results(cat, y_test, X_test):
     plt.title("Matriz de Confusão: Evasão Estudantil")
     plt.show()
 
+import re
+
+def normalize_text(col):
+    return (
+        col.str.lower()
+           .str.strip()
+           .str.replace(r'\s+', '', regex=True)   # remove spaces
+           .str.replace(r'[^a-z0-9]', '', regex=True)  # remove symbols
+    )
+
+
+def encoding (X_train, X_test, cat_features): 
+    X_train_encoded = pd.get_dummies(X_train, columns=cat_features)
+    X_test_encoded = pd.get_dummies(X_test, columns=cat_features)
+    X_train_encoded, X_test_encoded = X_train_encoded.align(X_test_encoded, join='left', axis=1, fill_value=0)
+    return X_train_encoded, X_test_encoded
 
 if __name__ == "__main__":
     with mlflow.start_run() as run:
         startTime = time.time()
+        print(f"Experiment ID: {run.info.experiment_id}")
         CONFIG_PATH = get_config_file()
         dfs = load_config(CONFIG_PATH)
 
         df_base = pd.read_csv(dfs["TRAINING_DATASET"])
 
         df_base = selecting_active_students(df_base)
-        df_base.drop(
-            columns={
-                "Sexo",
+
+        columns_to_drop = [    "Sexo",
                 "Raça",
                 "Estrutura",
                 "Período ingresso",
                 "Tipo ingresso",
-                "AnoSem",
-            },
+                "AnoSem"]
+        
+        df_base.drop(
+            columns=columns_to_drop,
             inplace=True,
         )
 
+
+        params = { "iterations": 1000, "learning_rate": 0.01, "depth": 6, "verbose": 0}
+
+
+
         X_train, X_test, y_train, y_test = splitting(df_base)
+
+        cat_features = X_train.select_dtypes(include=["object", "bool", "category"]).columns.tolist()
+
+        for col in cat_features:
+            X_train[col] = clean_feature_values(X_train[col])
+            X_test[col]  = clean_feature_values(X_test[col])
+
+        X_train, X_test = encoding(X_train, X_test, cat_features)
+
         mlflow.log_param("train_size", len(X_train))
         mlflow.log_param("test_size", len(X_test))
-        model = model_fitting(X_train, y_train)
+        model = model_fitting(X_train, y_train, params)
         results(model, y_test, X_test)
-        mlflow.catboost.log_model(model, "model")
+        mlflow.lightgbm.log_model(model, "model")
+        
+
 
         totalTime = time.time() - startTime
         print(f"Total training time: {totalTime:.2f} seconds")
